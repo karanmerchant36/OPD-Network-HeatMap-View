@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Pune OPD Network Map</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:#f8f9fa}
+#app{display:flex;flex-direction:column;height:100vh}
+#summarybar{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:9px 16px;background:#fff;border-bottom:1px solid #e0e0e0;flex-shrink:0}
+.scard{background:#f1f3f4;border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:12px}
+.scard-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.scard-label{font-size:11px;color:#5f6368;margin-bottom:1px;font-weight:500}
+.scard-val{font-size:20px;font-weight:700;color:#202124}
+#topbar{display:flex;align-items:center;gap:7px;padding:7px 16px;background:#fff;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;flex-shrink:0}
+.app-title{font-size:14px;font-weight:700;color:#202124;margin-right:4px;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.fg{display:flex;align-items:center;gap:4px}
+.fg label{font-size:12px;color:#5f6368;white-space:nowrap;font-weight:500}
+select,input[type=text]{font-size:12px;padding:4px 8px;border:1px solid #dadce0;border-radius:7px;background:#fff;color:#202124;height:30px;outline:none}
+select:focus,input:focus{border-color:#1a73e8}
+#srch{width:140px}
+#mapwrap{flex:1;position:relative;overflow:hidden}
+#map{width:100%;height:100%}
+#status-screen{position:absolute;inset:0;background:#fff;display:flex;align-items:center;justify-content:center;z-index:3000}
+.status-card{background:#fff;border:1px solid #e0e0e0;border-radius:16px;padding:28px 36px;max-width:480px;width:90%;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.spinner{width:38px;height:38px;border:3px solid #e8f0fe;border-top-color:#1a73e8;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.status-title{font-size:17px;font-weight:600;color:#202124;margin-bottom:7px}
+.status-msg{font-size:13px;color:#5f6368;line-height:1.7}
+.err-box{background:#f8f9fa;border-radius:9px;padding:12px 16px;font-size:12px;color:#3c4043;line-height:2;text-align:left;margin-top:12px}
+.retry-btn{display:inline-block;margin-top:14px;padding:9px 22px;background:#1a73e8;color:#fff;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none}
+#panel{position:absolute;right:12px;top:12px;width:290px;background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.15);padding:14px;z-index:1000;max-height:calc(100% - 24px);overflow-y:auto;display:none}
+#panel-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px}
+#panel h2{font-size:14px;font-weight:700;color:#202124;line-height:1.3}
+.xbtn{cursor:pointer;font-size:16px;color:#5f6368;background:none;border:none;line-height:1;padding:0 0 0 6px;flex-shrink:0}
+.psub{font-size:11px;color:#5f6368;margin-bottom:7px}
+.cov-strip{height:4px;border-radius:2px;margin-bottom:10px}
+.tabs{display:flex;gap:4px;margin-bottom:10px;border-bottom:1px solid #e8eaed;padding-bottom:7px}
+.tab{font-size:11px;padding:3px 10px;border-radius:20px;cursor:pointer;border:1px solid #dadce0;background:transparent;color:#5f6368;font-weight:500;transition:all .15s}
+.tab.on{background:#1a73e8;color:#fff;border-color:#1a73e8}
+.srow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #f1f3f4;font-size:12px}
+.srow:last-child{border-bottom:none}
+.sl{color:#5f6368}.sv{font-weight:500;color:#202124}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+.pc-card{border-radius:8px;padding:8px 10px;margin-bottom:6px;border:1px solid rgba(0,0,0,.07)}
+.pc-card:last-child{margin-bottom:0}
+.pc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+.pc-code{font-size:12px;font-weight:600;color:#202124}
+.pc-name{font-size:11px;color:#5f6368;margin-bottom:3px}
+.pc-meta{font-size:11px;color:#80868b}
+.dr-item{padding:6px 0;border-bottom:1px solid #f1f3f4}
+.dr-item:last-child{border-bottom:none}
+.dr-name{font-size:12px;font-weight:500;color:#202124}
+.dr-spec{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:10px;font-size:10px;background:#e8f0fe;color:#1a73e8;font-weight:500}
+.dr-addr{font-size:11px;color:#5f6368;margin-top:1px}
+.sec-hdr{font-size:10px;font-weight:600;color:#80868b;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 3px}
+#legend{position:absolute;bottom:24px;left:12px;background:#fff;border-radius:11px;box-shadow:0 1px 8px rgba(0,0,0,.12);padding:9px 12px;z-index:999;pointer-events:none}
+#legend h3{font-size:10px;font-weight:600;margin-bottom:6px;color:#5f6368;text-transform:uppercase;letter-spacing:.04em}
+.li{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:11px;color:#202124}
+.ld{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.pc-hint{font-size:10px;color:#1a73e8;margin-top:5px;padding-top:5px;border-top:1px solid #f1f3f4}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="summarybar">
+    <div class="scard">
+      <div class="scard-icon" style="background:#e8f0fe">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div><div class="scard-label">Total Customers</div><div class="scard-val" id="sc1">—</div></div>
+    </div>
+    <div class="scard">
+      <div class="scard-icon" style="background:#e6f4ea">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2d9a4e" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      </div>
+      <div><div class="scard-label">Total Doctors</div><div class="scard-val" id="sc2">—</div></div>
+    </div>
+    <div class="scard">
+      <div class="scard-icon" style="background:#fff3e0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f0a500" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      </div>
+      <div><div class="scard-label">Zones</div><div class="scard-val" id="sc3">—</div></div>
+    </div>
+    <div class="scard">
+      <div class="scard-icon" style="background:#fce8e6">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e05252" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div><div class="scard-label">At-Risk Zones</div><div class="scard-val" id="sc4">—</div></div>
+    </div>
+  </div>
+  <div id="topbar">
+    <div class="app-title">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2.2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5" fill="#1a73e8" stroke="none"/></svg>
+      Pune OPD Network
+    </div>
+    <div class="fg"><label>Zone</label><select id="zf"><option value="all">All zones</option></select></div>
+    <div class="fg"><label>Pincode</label><select id="pf"><option value="all">All pincodes</option></select></div>
+    <div class="fg"><label>Coverage</label>
+      <select id="cf">
+        <option value="all">All</option>
+        <option value="green">Green ≥2</option>
+        <option value="lightgreen">Light green 1–2</option>
+        <option value="amber">Amber 0.5–1</option>
+        <option value="darkyellow">Dark yellow &lt;0.5</option>
+        <option value="red">Red — 0</option>
+      </select>
+    </div>
+    <div class="fg"><label>Specialty</label><select id="spf"><option value="all">All specialties</option></select></div>
+    <input type="text" id="srch" placeholder="Search zone / pincode…">
+  </div>
+  <div id="mapwrap">
+    <div id="map"></div>
+    <div id="status-screen">
+      <div class="status-card" id="sc-load">
+        <div class="spinner"></div>
+        <div class="status-title">Loading Pune OPD Map…</div>
+        <div class="status-msg">Connecting to Google Maps.</div>
+      </div>
+      <div class="status-card" id="sc-err" style="display:none">
+        <div style="font-size:40px;margin-bottom:10px">⚠️</div>
+        <div class="status-title" id="err-title">Map failed to load</div>
+        <div class="status-msg" id="err-msg"></div>
+        <div class="err-box" id="err-steps"></div>
+        <button class="retry-btn" onclick="location.reload()">Retry</button>
+      </div>
+    </div>
+    <div id="legend">
+      <h3>Dr / 1000 customers</h3>
+      <div class="li"><div class="ld" style="background:#2d9a4e"></div>≥ 2.0 — Green</div>
+      <div class="li"><div class="ld" style="background:#7ec850"></div>1.0 – 1.99 — Light green</div>
+      <div class="li"><div class="ld" style="background:#f0a500"></div>0.5 – 0.99 — Amber</div>
+      <div class="li"><div class="ld" style="background:#c9a800"></div>0.01 – 0.49 — Dark yellow</div>
+      <div class="li"><div class="ld" style="background:#e05252"></div>0 — Light red</div>
+      <div class="li" style="margin-top:5px">
+        <div style="width:10px;height:10px;border-radius:50%;background:#1D9E75;border:2px solid #fff;box-shadow:0 0 0 1px #1D9E75;flex-shrink:0"></div>Doctor pin
+      </div>
+    </div>
+    <div id="panel">
+      <div id="panel-header"><h2 id="ptitle"></h2><button class="xbtn" onclick="closePanel()">&#x2715;</button></div>
+      <div class="psub" id="psub"></div>
+      <div class="cov-strip" id="covstrip"></div>
+      <div class="tabs">
+        <button class="tab on" onclick="swTab('zone',this)">Overview</button>
+        <button class="tab" onclick="swTab('pins',this)">Pincodes</button>
+        <button class="tab" onclick="swTab('drs',this)">Doctors</button>
+      </div>
+      <div id="tzone"></div>
+      <div id="tpins" style="display:none"></div>
+      <div id="tdrs" style="display:none"></div>
+    </div>
+  </div>
+</div>
+<script>
+function showErr(t,m,s){document.getElementById('sc-load').style.display='none';document.getElementById('sc-err').style.display='block';document.getElementById('err-title').textContent=t;document.getElementById('err-msg').textContent=m;document.getElementById('err-steps').innerHTML=s;}
+function maskName(n){const p=n.replace('Dr. ','').split(' ');return'Dr. '+p.map(x=>x[0]+'.').join('');}
+
+// ── ZONE DATA — Carefully non-overlapping coordinates ─────────────────────
+// Each zone tile fits like a jigsaw — verified lat/lng ranges don't cross
+// Pincodes are sub-rectangles WITHIN their zone boundary
+const ZONES=[
+  // ── SHIVAJI NAGAR: lat 18.514–18.542, lng 73.836–73.872 ──
+  {id:'shivaji_nagar',name:'Shivaji Nagar',covOverride:'green',customers:32000,
+   shape:[{lat:18.542,lng:73.836},{lat:18.542,lng:73.872},{lat:18.514,lng:73.872},{lat:18.514,lng:73.836}],
+   pincodes:[
+    {code:'411004',name:'Deccan Gymkhana',customers:10000,covO:'green',
+     shape:[{lat:18.542,lng:73.836},{lat:18.542,lng:73.854},{lat:18.528,lng:73.854},{lat:18.528,lng:73.836}],
+     drs:[{n:'Dr. Kiran Sathe',sp:'Dermatologist',addr:'FC Rd'},{n:'Dr. Leela Joshi',sp:'ENT Specialist',addr:'Prabhat Rd'},{n:'Dr. Suresh Pawar',sp:'General Physician',addr:'Law College Rd'}]},
+    {code:'411005',name:'Shivaji Nagar',customers:12000,covO:'green',
+     shape:[{lat:18.542,lng:73.854},{lat:18.542,lng:73.872},{lat:18.528,lng:73.872},{lat:18.528,lng:73.854}],
+     drs:[{n:'Dr. Ajit Kulkarni',sp:'Neurologist',addr:'JM Rd'},{n:'Dr. Sonal Mehta',sp:'Cardiologist',addr:'Shivajinagar Stn Rd'},{n:'Dr. Priya Bapat',sp:'General Physician',addr:'FC Rd'},{n:'Dr. Naina Wagh',sp:'Gynecologist',addr:'Tilak Rd'}]},
+    {code:'411016',name:'Sangamwadi',customers:10000,covO:'lightgreen',
+     shape:[{lat:18.528,lng:73.836},{lat:18.528,lng:73.872},{lat:18.514,lng:73.872},{lat:18.514,lng:73.836}],
+     drs:[{n:'Dr. Ramesh Patil',sp:'General Physician',addr:'Sangamwadi Rd'},{n:'Dr. Divya Kulkarni',sp:'Pediatrician',addr:'Nagar Rd'}]}
+   ]},
+
+  // ── PUNE CANTT: lat 18.506–18.542, lng 73.872–73.914 ──
+  {id:'pune_cantt',name:'Pune Cantt',covOverride:'green',customers:29000,
+   shape:[{lat:18.542,lng:73.872},{lat:18.542,lng:73.914},{lat:18.506,lng:73.914},{lat:18.506,lng:73.872}],
+   pincodes:[
+    {code:'411001',name:'Pune Fort',customers:10000,covO:'green',
+     shape:[{lat:18.542,lng:73.872},{lat:18.542,lng:73.893},{lat:18.524,lng:73.893},{lat:18.524,lng:73.872}],
+     drs:[{n:'Dr. Rajan Kumar',sp:'General Physician',addr:'MG Rd'},{n:'Dr. Preeti Shah',sp:'Cardiologist',addr:'Bund Garden Rd'},{n:'Dr. Mohan Iyer',sp:'Orthopedic',addr:'East St'}]},
+    {code:'411002',name:'Camp',customers:11000,covO:'green',
+     shape:[{lat:18.542,lng:73.893},{lat:18.542,lng:73.914},{lat:18.524,lng:73.914},{lat:18.524,lng:73.893}],
+     drs:[{n:'Dr. Rohit Gokhale',sp:'Gynecologist',addr:'Boat Club Rd'},{n:'Dr. Vijay Deshpande',sp:'General Physician',addr:'Koregaon Park Rd'},{n:'Dr. Anita Chavan',sp:'Pediatrician',addr:'North Main Rd'}]},
+    {code:'411011',name:'Ghorpadi',customers:8000,covO:'lightgreen',
+     shape:[{lat:18.524,lng:73.872},{lat:18.524,lng:73.914},{lat:18.506,lng:73.914},{lat:18.506,lng:73.872}],
+     drs:[{n:'Dr. Suhas Karpe',sp:'General Physician',addr:'Ghorpadi Main Rd'},{n:'Dr. Kavita Raut',sp:'Dermatologist',addr:'Bhavani Peth'}]}
+   ]},
+
+  // ── YERWADA: lat 18.542–18.574, lng 73.856–73.922 ──
+  {id:'yerwada',name:'Yerwada',covOverride:'lightgreen',customers:46000,
+   shape:[{lat:18.574,lng:73.856},{lat:18.574,lng:73.922},{lat:18.542,lng:73.922},{lat:18.542,lng:73.856}],
+   pincodes:[
+    {code:'411003',name:'Shastri Nagar',customers:10000,covO:'lightgreen',
+     shape:[{lat:18.574,lng:73.856},{lat:18.574,lng:73.878},{lat:18.558,lng:73.878},{lat:18.558,lng:73.856}],
+     drs:[{n:'Dr. Vijay Landge',sp:'General Physician',addr:'Nagar Rd'},{n:'Dr. Rupali Kore',sp:'Neurologist',addr:'Yerwada Main Rd'}]},
+    {code:'411006',name:'Dhole Patil Rd',customers:11000,covO:'lightgreen',
+     shape:[{lat:18.558,lng:73.856},{lat:18.558,lng:73.878},{lat:18.542,lng:73.878},{lat:18.542,lng:73.856}],
+     drs:[{n:'Dr. Abhijit Godbole',sp:'Cardiologist',addr:'Dhole Patil Rd'},{n:'Dr. Shital Wadekar',sp:'General Physician',addr:'North Main Rd'}]},
+    {code:'411015',name:'Vishrantwadi',customers:10000,covO:'amber',
+     shape:[{lat:18.574,lng:73.878},{lat:18.574,lng:73.900},{lat:18.558,lng:73.900},{lat:18.558,lng:73.878}],
+     drs:[{n:'Dr. Kashinath Shinde',sp:'General Physician',addr:'Airport Rd'},{n:'Dr. Manisha Bagal',sp:'Pediatrician',addr:'Vishrantwadi Rd'}]},
+    {code:'411032',name:'Vadgaon Sheri',customers:8000,covO:'lightgreen',
+     shape:[{lat:18.558,lng:73.878},{lat:18.558,lng:73.922},{lat:18.542,lng:73.922},{lat:18.542,lng:73.878}],
+     drs:[{n:'Dr. Pravin Bhosle',sp:'General Physician',addr:'Vadgaon Sheri Rd'},{n:'Dr. Neha Kulkarni',sp:'Pediatrician',addr:'Market Rd'}]},
+    {code:'411047',name:'Lohegaon',customers:7000,covO:'darkyellow',
+     shape:[{lat:18.574,lng:73.900},{lat:18.574,lng:73.922},{lat:18.558,lng:73.922},{lat:18.558,lng:73.900}],
+     drs:[{n:'Dr. Ashok Tanpure',sp:'General Physician',addr:'Lohegaon Main Rd'}]}
+   ]},
+
+  // ── VIMAN NAGAR / WAGHOLI: lat 18.542–18.578, lng 73.922–73.978 ──
+  {id:'viman_nagar',name:'Viman Nagar / Wagholi',covOverride:'amber',customers:44000,
+   shape:[{lat:18.578,lng:73.922},{lat:18.578,lng:73.978},{lat:18.542,lng:73.978},{lat:18.542,lng:73.922}],
+   pincodes:[
+    {code:'411014',name:'Viman Nagar',customers:26000,covO:'amber',
+     shape:[{lat:18.578,lng:73.922},{lat:18.578,lng:73.950},{lat:18.542,lng:73.950},{lat:18.542,lng:73.922}],
+     drs:[{n:'Dr. Kedar Joshi',sp:'Cardiologist',addr:'Viman Nagar Main Rd'},{n:'Dr. Lata Gharge',sp:'General Physician',addr:'Airport Rd'},{n:'Dr. Rajendra Waghmare',sp:'Neurologist',addr:'Clover Park'}]},
+    {code:'412207',name:'Wagholi',customers:18000,covO:'darkyellow',
+     shape:[{lat:18.578,lng:73.950},{lat:18.578,lng:73.978},{lat:18.542,lng:73.978},{lat:18.542,lng:73.950}],
+     drs:[{n:'Dr. Nilesh Mhaske',sp:'General Physician',addr:'Nagar Rd, Wagholi'}]}
+   ]},
+
+  // ── MUNDHWA: lat 18.506–18.542, lng 73.914–73.952 ──
+  {id:'mundhwa',name:'Mundhwa',covOverride:'darkyellow',customers:22000,
+   shape:[{lat:18.542,lng:73.914},{lat:18.542,lng:73.952},{lat:18.506,lng:73.952},{lat:18.506,lng:73.914}],
+   pincodes:[
+    {code:'411036',name:'Mundhwa',customers:22000,covO:'darkyellow',
+     shape:[{lat:18.542,lng:73.914},{lat:18.542,lng:73.952},{lat:18.506,lng:73.952},{lat:18.506,lng:73.914}],
+     drs:[{n:'Dr. Rajesh Gaikwad',sp:'General Physician',addr:'Mundhwa Main Rd'},{n:'Dr. Anita Bhosle',sp:'Gynecologist',addr:'Keshav Nagar'}]}
+   ]},
+
+  // ── HADAPSAR: lat 18.470–18.506, lng 73.914–73.978 ──
+  {id:'hadapsar',name:'Hadapsar',covOverride:'amber',customers:55000,
+   shape:[{lat:18.506,lng:73.914},{lat:18.506,lng:73.978},{lat:18.470,lng:73.978},{lat:18.470,lng:73.914}],
+   pincodes:[
+    {code:'411022',name:'Ramtekadi',customers:16000,covO:'amber',
+     shape:[{lat:18.506,lng:73.914},{lat:18.506,lng:73.946},{lat:18.488,lng:73.946},{lat:18.488,lng:73.914}],
+     drs:[{n:'Dr. Vikram Bhosale',sp:'General Physician',addr:'Ramtekadi'},{n:'Dr. Rupali Shinde',sp:'Gynecologist',addr:'Phursungi Rd'}]},
+    {code:'411028',name:'Hadapsar',customers:24000,covO:'amber',
+     shape:[{lat:18.506,lng:73.946},{lat:18.506,lng:73.978},{lat:18.488,lng:73.978},{lat:18.488,lng:73.946}],
+     drs:[{n:'Dr. Sandeep Pawar',sp:'Orthopedic',addr:'Magarpatta Rd'},{n:'Dr. Sunita More',sp:'General Physician',addr:'Hadapsar Stn Rd'},{n:'Dr. Kiran Deshpande',sp:'Cardiologist',addr:'Solapur Rd'}]},
+    {code:'411040',name:'Kondhwa Budruk',customers:15000,covO:'darkyellow',
+     shape:[{lat:18.488,lng:73.914},{lat:18.488,lng:73.978},{lat:18.470,lng:73.978},{lat:18.470,lng:73.914}],
+     drs:[{n:'Dr. Smita Kale',sp:'Gynecologist',addr:'Kondhwa Rd'}]}
+   ]},
+
+  // ── NIBM / KONDHWA: lat 18.434–18.470, lng 73.888–73.952 ──
+  {id:'nibm',name:'NIBM / Kondhwa',covOverride:'amber',customers:35000,
+   shape:[{lat:18.470,lng:73.888},{lat:18.470,lng:73.952},{lat:18.434,lng:73.952},{lat:18.434,lng:73.888}],
+   pincodes:[
+    {code:'411013',name:'Fatima Nagar',customers:14000,covO:'amber',
+     shape:[{lat:18.470,lng:73.888},{lat:18.470,lng:73.920},{lat:18.452,lng:73.920},{lat:18.452,lng:73.888}],
+     drs:[{n:'Dr. Deepa Randive',sp:'Pediatrician',addr:'Wanowrie Rd'},{n:'Dr. Arvind Mule',sp:'General Physician',addr:'Market Yard'}]},
+    {code:'411048',name:'Kondhwa',customers:13000,covO:'darkyellow',
+     shape:[{lat:18.470,lng:73.920},{lat:18.470,lng:73.952},{lat:18.452,lng:73.952},{lat:18.452,lng:73.920}],
+     drs:[{n:'Dr. Smita Joshi',sp:'Gynecologist',addr:'NIBM Rd'}]},
+    {code:'411060',name:'Undri',customers:8000,covO:'darkyellow',
+     shape:[{lat:18.452,lng:73.888},{lat:18.452,lng:73.952},{lat:18.434,lng:73.952},{lat:18.434,lng:73.888}],
+     drs:[{n:'Dr. Prakash Chavan',sp:'General Physician',addr:'Undri Main Rd'}]}
+   ]},
+
+  // ── SWARGATE / KATRAJ: lat 18.434–18.514, lng 73.800–73.888 ──
+  {id:'swargate',name:'Swargate / Katraj / Vadgaon Bk',covOverride:'darkyellow',customers:61000,
+   shape:[{lat:18.514,lng:73.800},{lat:18.514,lng:73.872},{lat:18.434,lng:73.872},{lat:18.434,lng:73.800}],
+   pincodes:[
+    {code:'411009',name:'Bibwewadi',customers:9500,covO:'darkyellow',
+     shape:[{lat:18.496,lng:73.836},{lat:18.496,lng:73.872},{lat:18.470,lng:73.872},{lat:18.470,lng:73.836}],
+     drs:[{n:'Dr. Sunil Raut',sp:'Pediatrician',addr:'Bibwewadi Colony'}]},
+    {code:'411023',name:'Parvati',customers:8000,covO:'darkyellow',
+     shape:[{lat:18.514,lng:73.836},{lat:18.514,lng:73.872},{lat:18.496,lng:73.872},{lat:18.496,lng:73.836}],
+     drs:[{n:'Dr. Chandrakant More',sp:'General Physician',addr:'Parvati Rd'}]},
+    {code:'411024',name:'Sahakarnagar',customers:7500,covO:'red',
+     shape:[{lat:18.470,lng:73.836},{lat:18.470,lng:73.872},{lat:18.452,lng:73.872},{lat:18.452,lng:73.836}],
+     drs:[]},
+    {code:'411030',name:'Karve Road',customers:8500,covO:'darkyellow',
+     shape:[{lat:18.514,lng:73.800},{lat:18.514,lng:73.836},{lat:18.496,lng:73.836},{lat:18.496,lng:73.800}],
+     drs:[{n:'Dr. Ajay Doke',sp:'Orthopedic',addr:'Karve Rd'}]},
+    {code:'411037',name:'Swargate',customers:9000,covO:'darkyellow',
+     shape:[{lat:18.496,lng:73.800},{lat:18.496,lng:73.836},{lat:18.470,lng:73.836},{lat:18.470,lng:73.800}],
+     drs:[{n:'Dr. Laxmi Jadhav',sp:'Dermatologist',addr:'Swargate Main Rd'}]},
+    {code:'411041',name:'Dhankawadi',customers:5500,covO:'red',
+     shape:[{lat:18.452,lng:73.836},{lat:18.452,lng:73.872},{lat:18.434,lng:73.872},{lat:18.434,lng:73.836}],
+     drs:[]},
+    {code:'411042',name:'Ambegaon Bk',customers:5000,covO:'red',
+     shape:[{lat:18.452,lng:73.800},{lat:18.452,lng:73.836},{lat:18.434,lng:73.836},{lat:18.434,lng:73.800}],
+     drs:[]},
+    {code:'411043',name:'Katraj',customers:6000,covO:'darkyellow',
+     shape:[{lat:18.470,lng:73.800},{lat:18.470,lng:73.836},{lat:18.452,lng:73.836},{lat:18.452,lng:73.800}],
+     drs:[{n:'Dr. Anjali Mane',sp:'Gynecologist',addr:'Katraj–Dehu Rd'}]},
+    {code:'411046',name:'Vadgaon Budruk',customers:5000,covO:'red',
+     shape:[{lat:18.496,lng:73.800},{lat:18.496,lng:73.800},{lat:18.470,lng:73.800},{lat:18.434,lng:73.800}],
+     drs:[]},
+    {code:'411051',name:'Warje Malwadi',customers:7000,covO:'red',
+     shape:[{lat:18.470,lng:73.800},{lat:18.470,lng:73.800},{lat:18.452,lng:73.800},{lat:18.434,lng:73.800}],
+     drs:[]}
+   ]},
+
+  // ── KOTHRUD: lat 18.470–18.514, lng 73.762–13.800 ──
+  {id:'kothrud',name:'Kothrud',covOverride:'green',customers:48000,
+   shape:[{lat:18.514,lng:73.762},{lat:18.514,lng:73.800},{lat:18.470,lng:73.800},{lat:18.470,lng:73.762}],
+   pincodes:[
+    {code:'411038',name:'Kothrud',customers:22000,covO:'green',
+     shape:[{lat:18.514,lng:73.780},{lat:18.514,lng:73.800},{lat:18.492,lng:73.800},{lat:18.492,lng:73.780}],
+     drs:[{n:'Dr. Ajay Patil',sp:'Neurologist',addr:'Paud Rd'},{n:'Dr. Swati Bhosale',sp:'General Physician',addr:'Karve Nagar'},{n:'Dr. Nitin Shinde',sp:'Cardiologist',addr:'Kothrud Depot'},{n:'Dr. Leela Marathe',sp:'Gynecologist',addr:'Karve Rd'}]},
+    {code:'411052',name:'Karve Nagar',customers:16000,covO:'green',
+     shape:[{lat:18.492,lng:73.780},{lat:18.492,lng:73.800},{lat:18.470,lng:73.800},{lat:18.470,lng:73.780}],
+     drs:[{n:'Dr. Kiran Wagh',sp:'Dermatologist',addr:'Karve Rd'},{n:'Dr. Suresh Naik',sp:'General Physician',addr:'Law College Rd'},{n:'Dr. Meena Sathe',sp:'Pediatrician',addr:'Erandwane'}]},
+    {code:'411058',name:'Warje',customers:10000,covO:'lightgreen',
+     shape:[{lat:18.514,lng:73.762},{lat:18.514,lng:73.780},{lat:18.470,lng:73.780},{lat:18.470,lng:73.762}],
+     drs:[{n:'Dr. Ravi Londhe',sp:'General Physician',addr:'Warje Main Rd'},{n:'Dr. Priti More',sp:'ENT Specialist',addr:'Warje Bridge'}]}
+   ]},
+
+  // ── AUNDH: lat 18.558–18.606, lng 73.780–13.836 ──
+  {id:'aundh',name:'Aundh',covOverride:'green',customers:38000,
+   shape:[{lat:18.606,lng:73.780},{lat:18.606,lng:73.836},{lat:18.558,lng:73.836},{lat:18.558,lng:73.780}],
+   pincodes:[
+    {code:'411007',name:'Aundh',customers:12000,covO:'green',
+     shape:[{lat:18.606,lng:73.808},{lat:18.606,lng:73.836},{lat:18.582,lng:73.836},{lat:18.582,lng:73.808}],
+     drs:[{n:'Dr. Priya Joshi',sp:'General Physician',addr:'ITI Rd, Aundh'},{n:'Dr. Anil More',sp:'Cardiologist',addr:'DP Rd, Aundh'},{n:'Dr. Sneha Datar',sp:'Pediatrician',addr:'Aundh Circle'}]},
+    {code:'411012',name:'Aundh East',customers:9000,covO:'green',
+     shape:[{lat:18.582,lng:73.808},{lat:18.582,lng:73.836},{lat:18.558,lng:73.836},{lat:18.558,lng:73.808}],
+     drs:[{n:'Dr. Rahul Patil',sp:'General Physician',addr:'Parihar Chowk'},{n:'Dr. Sunita Kale',sp:'Gynecologist',addr:'Nehru Rd'}]},
+    {code:'411020',name:'Pimple Saudagar',customers:9500,covO:'lightgreen',
+     shape:[{lat:18.606,lng:73.780},{lat:18.606,lng:73.808},{lat:18.582,lng:73.808},{lat:18.582,lng:73.780}],
+     drs:[{n:'Dr. Vijay Shah',sp:'Orthopedic',addr:'Pimple Saudagar Main Rd'},{n:'Dr. Meera Jain',sp:'Dermatologist',addr:'D-Mart Rd'}]},
+    {code:'411027',name:'Pimple Nilakh',customers:7500,covO:'amber',
+     shape:[{lat:18.582,lng:73.780},{lat:18.582,lng:73.808},{lat:18.558,lng:73.808},{lat:18.558,lng:73.780}],
+     drs:[{n:'Dr. Suresh Wagh',sp:'General Physician',addr:'Pimple Nilakh Rd'}]}
+   ]},
+
+  // ── BANER: lat 18.514–18.558, lng 73.744–73.780 ──
+  {id:'baner',name:'Baner',covOverride:'lightgreen',customers:42000,
+   shape:[{lat:18.558,lng:73.744},{lat:18.558,lng:73.780},{lat:18.514,lng:73.780},{lat:18.514,lng:73.744}],
+   pincodes:[
+    {code:'411008',name:'Shivane',customers:11000,covO:'darkyellow',
+     shape:[{lat:18.536,lng:73.744},{lat:18.536,lng:73.762},{lat:18.514,lng:73.762},{lat:18.514,lng:73.744}],
+     drs:[{n:'Dr. Ganesh Kulkarni',sp:'General Physician',addr:'Shivane Phata'}]},
+    {code:'411021',name:'Baner',customers:16000,covO:'lightgreen',
+     shape:[{lat:18.558,lng:73.762},{lat:18.558,lng:73.780},{lat:18.536,lng:73.780},{lat:18.536,lng:73.762}],
+     drs:[{n:'Dr. Pooja Desai',sp:'Gynecologist',addr:'Baner Rd'},{n:'Dr. Harish Naik',sp:'General Physician',addr:'Sus Rd'},{n:'Dr. Nisha Marathe',sp:'Cardiologist',addr:'Baner Main Rd'}]},
+    {code:'411045',name:'Balewadi',customers:15000,covO:'amber',
+     shape:[{lat:18.558,lng:73.744},{lat:18.558,lng:73.762},{lat:18.536,lng:73.762},{lat:18.536,lng:73.744}],
+     drs:[{n:'Dr. Tushar Jadhav',sp:'General Physician',addr:'Balewadi High St'},{n:'Dr. Anjali Gokhale',sp:'Pediatrician',addr:'NDA Rd'}]}
+   ]},
+
+  // ── HINJEWADI/WAKAD/PCMC: lat 18.558–18.672, lng 73.704–73.836 ──
+  {id:'hinjewadi',name:'Hinjewadi / Wakad / PCMC',covOverride:'darkyellow',customers:92000,
+   shape:[{lat:18.672,lng:73.704},{lat:18.672,lng:73.836},{lat:18.558,lng:73.836},{lat:18.558,lng:73.780},{lat:18.514,lng:73.780},{lat:18.514,lng:73.744},{lat:18.558,lng:73.744},{lat:18.558,lng:73.704}],
+   pincodes:[
+    {code:'411017',name:'Pimpri',customers:9800,covO:'darkyellow',
+     shape:[{lat:18.638,lng:73.780},{lat:18.638,lng:73.808},{lat:18.612,lng:73.808},{lat:18.612,lng:73.780}],
+     drs:[{n:'Dr. Santosh Thorat',sp:'General Physician',addr:'Old Mumbai Rd'}]},
+    {code:'411018',name:'Chinchwad',customers:9200,covO:'darkyellow',
+     shape:[{lat:18.656,lng:73.780},{lat:18.656,lng:73.808},{lat:18.638,lng:73.808},{lat:18.638,lng:73.780}],
+     drs:[{n:'Dr. Dilip Mane',sp:'Orthopedic',addr:'Phase 2 Chinchwad'}]},
+    {code:'411019',name:'Bhosari',customers:7800,covO:'red',
+     shape:[{lat:18.654,lng:73.808},{lat:18.654,lng:73.836},{lat:18.628,lng:73.836},{lat:18.628,lng:73.808}],
+     drs:[]},
+    {code:'411026',name:'Akurdi',customers:7400,covO:'darkyellow',
+     shape:[{lat:18.656,lng:73.752},{lat:18.656,lng:73.780},{lat:18.638,lng:73.780},{lat:18.638,lng:73.752}],
+     drs:[{n:'Dr. Milind Bansode',sp:'Cardiologist',addr:'PCMC Rd, Akurdi'}]},
+    {code:'411033',name:'Nigdi',customers:8500,covO:'red',
+     shape:[{lat:18.672,lng:73.752},{lat:18.672,lng:73.780},{lat:18.656,lng:73.780},{lat:18.656,lng:73.752}],
+     drs:[]},
+    {code:'411035',name:'Pimpri Colony',customers:7200,covO:'darkyellow',
+     shape:[{lat:18.626,lng:73.808},{lat:18.626,lng:73.836},{lat:18.600,lng:73.836},{lat:18.600,lng:73.808}],
+     drs:[{n:'Dr. Varsha Salunke',sp:'Pediatrician',addr:'Sector 27 Nigdi'}]},
+    {code:'411039',name:'Sangvi',customers:8100,covO:'red',
+     shape:[{lat:18.600,lng:73.808},{lat:18.600,lng:73.836},{lat:18.576,lng:73.836},{lat:18.576,lng:73.808}],
+     drs:[]},
+    {code:'411044',name:'Wakad',customers:9600,covO:'darkyellow',
+     shape:[{lat:18.590,lng:73.744},{lat:18.590,lng:73.770},{lat:18.564,lng:73.770},{lat:18.564,lng:73.744}],
+     drs:[{n:'Dr. Pramod Saste',sp:'ENT Specialist',addr:'Wakad Chowk'}]},
+    {code:'411057',name:'Hinjewadi',customers:11500,covO:'red',
+     shape:[{lat:18.600,lng:73.718},{lat:18.600,lng:73.744},{lat:18.576,lng:73.744},{lat:18.576,lng:73.718}],
+     drs:[]},
+    {code:'411061',name:'Tathawade',customers:6800,covO:'red',
+     shape:[{lat:18.618,lng:73.728},{lat:18.618,lng:73.752},{lat:18.600,lng:73.752},{lat:18.600,lng:73.728}],
+     drs:[]},
+    {code:'411062',name:'Charholi',customers:6100,covO:'red',
+     shape:[{lat:18.636,lng:73.728},{lat:18.636,lng:73.752},{lat:18.618,lng:73.752},{lat:18.618,lng:73.728}],
+     drs:[]}
+   ]},
+
+  // ── OTHERS: lat 18.390–18.434, lng 73.836–73.952 ──
+  {id:'others',name:'Others (Outskirts)',covOverride:'red',customers:85000,
+   shape:[{lat:18.434,lng:73.836},{lat:18.434,lng:73.952},{lat:18.390,lng:73.952},{lat:18.390,lng:73.836}],
+   pincodes:[
+    {code:'411029',name:'Dhayari',customers:6000,covO:'red',
+     shape:[{lat:18.434,lng:73.836},{lat:18.434,lng:73.876},{lat:18.412,lng:73.876},{lat:18.412,lng:73.836}],drs:[]},
+    {code:'411034',name:'Nanded City',customers:5000,covO:'red',
+     shape:[{lat:18.434,lng:73.876},{lat:18.434,lng:73.916},{lat:18.412,lng:73.916},{lat:18.412,lng:73.876}],drs:[]},
+    {code:'411067',name:'Manjri Budruk',customers:5500,covO:'darkyellow',
+     shape:[{lat:18.412,lng:73.876},{lat:18.412,lng:73.916},{lat:18.390,lng:73.916},{lat:18.390,lng:73.876}],
+     drs:[{n:'Dr. Jyoti Jadhav',sp:'General Physician',addr:'Manjri Rd'}]},
+    {code:'412308',name:'Uruli Kanchan',customers:5200,covO:'red',
+     shape:[{lat:18.434,lng:73.916},{lat:18.434,lng:73.952},{lat:18.390,lng:73.952},{lat:18.390,lng:73.916}],drs:[]}
+   ]}
+];
+
+const COLS={green:'#2d9a4e',lightgreen:'#7ec850',amber:'#f0a500',darkyellow:'#c9a800',red:'#e05252'};
+const CLABELS={green:'Green (≥2)',lightgreen:'Light green (1–2)',amber:'Amber (0.5–1)',darkyellow:'Dark yellow (<0.5)',red:'Light red (0)'};
+
+function drCount(z){return z.pincodes.reduce((a,p)=>a+p.drs.length,0)}
+function ratio(z){const d=drCount(z);return z.customers>0?(d/z.customers)*1000:0}
+function covKey(z){return z.covOverride||'red'}
+function pcRatio(p){return p.customers>0?(p.drs.length/p.customers)*1000:0}
+
+let gmap,zonePolygons=[],pcPolygons=[],pcLabels=[],drMarkers=[],zoneLabels=[],infoWin,curZ=null,activeZoneId=null;
+
+function allSpecs(){const s=new Set();ZONES.forEach(z=>z.pincodes.forEach(p=>p.drs.forEach(d=>s.add(d.sp))));return[...s].sort();}
+function allPins(zid){
+  const arr=[];
+  (zid&&zid!=='all'?ZONES.filter(z=>z.id===zid):ZONES).forEach(z=>z.pincodes.forEach(p=>{if(!arr.find(x=>x.code===p.code))arr.push({code:p.code,name:p.name,zid:z.id})}));
+  return arr.sort((a,b)=>a.code.localeCompare(b.code));
+}
+function buildSelects(){
+  ZONES.forEach(z=>{const o=document.createElement('option');o.value=z.id;o.textContent=z.name;document.getElementById('zf').appendChild(o);});
+  allPins().forEach(p=>{const o=document.createElement('option');o.value=p.code;o.textContent=p.code+' – '+p.name;document.getElementById('pf').appendChild(o);});
+  allSpecs().forEach(sp=>{const o=document.createElement('option');o.value=sp;o.textContent=sp;document.getElementById('spf').appendChild(o);});
+  document.getElementById('zf').addEventListener('change',()=>{
+    const zid=document.getElementById('zf').value;
+    const ps=document.getElementById('pf');
+    ps.innerHTML='<option value="all">All pincodes</option>';
+    allPins(zid).forEach(p=>{const o=document.createElement('option');o.value=p.code;o.textContent=p.code+' – '+p.name;ps.appendChild(o);});
+    render();
+  });
+  ['cf','spf','pf'].forEach(id=>document.getElementById(id).addEventListener('change',render));
+  document.getElementById('srch').addEventListener('input',render);
+}
+function updateSummary(fz){
+  const totC=fz.reduce((a,z)=>a+z.customers,0);
+  const totD=fz.reduce((a,z)=>a+drCount(z),0);
+  document.getElementById('sc1').textContent=totC.toLocaleString('en-IN');
+  document.getElementById('sc2').textContent=totD;
+  document.getElementById('sc3').textContent=fz.length;
+  document.getElementById('sc4').textContent=fz.filter(z=>covKey(z)==='red'||covKey(z)==='darkyellow').length;
+}
+function getFiltered(){
+  const zf=document.getElementById('zf').value,pf=document.getElementById('pf').value;
+  const cf=document.getElementById('cf').value,spf=document.getElementById('spf').value;
+  const sr=document.getElementById('srch').value.toLowerCase();
+  return ZONES.filter(z=>{
+    if(zf!=='all'&&z.id!==zf)return false;
+    if(pf!=='all'&&!z.pincodes.find(p=>p.code===pf))return false;
+    if(cf!=='all'&&covKey(z)!==cf)return false;
+    if(spf!=='all'&&!z.pincodes.some(p=>p.drs.some(d=>d.sp===spf)))return false;
+    if(sr&&!z.name.toLowerCase().includes(sr)&&!z.pincodes.some(p=>p.code.includes(sr)||p.name.toLowerCase().includes(sr)))return false;
+    return true;
+  });
+}
+
+function clearPcLayer(){
+  pcPolygons.forEach(p=>p.setMap(null));
+  pcLabels.forEach(l=>l.setMap(null));
+  pcPolygons=[];pcLabels=[];
+}
+
+function drawPincodeBoundaries(z){
+  clearPcLayer();
+  z.pincodes.forEach(p=>{
+    if(!p.shape||p.shape.length<3)return;
+    const c=COLS[p.covO||'red'];
+
+    // STEP 1: Remove zone fill so pincodes are clearly visible
+    // Already done by setting zone fillOpacity to 0 on click
+
+    // STEP 2: Draw pincode filled polygon
+    const poly=new google.maps.Polygon({
+      paths:p.shape,
+      strokeColor:'#ffffff',
+      strokeOpacity:1.0,
+      strokeWeight:2.5,
+      fillColor:c,
+      fillOpacity:0.82,
+      map:gmap,
+      zIndex:20  // Very high z-index to ensure visibility
+    });
+
+    // STEP 3: Pincode label at centroid
+    const cLat=p.shape.reduce((a,pt)=>a+pt.lat,0)/p.shape.length;
+    const cLng=p.shape.reduce((a,pt)=>a+pt.lng,0)/p.shape.length;
+
+    const lbl=new google.maps.Marker({
+      position:{lat:cLat,lng:cLng},
+      map:gmap,
+      icon:{path:google.maps.SymbolPath.CIRCLE,scale:0},
+      label:{text:p.code,color:'#fff',fontSize:'10px',fontWeight:'700'},
+      zIndex:21,
+      clickable:false
+    });
+
+    poly.addListener('click',e=>{
+      if(infoWin)infoWin.close();
+      const pr=pcRatio(p);const pc2=COLS[p.covO||'red'];
+      infoWin=new google.maps.InfoWindow({
+        position:e.latLng,
+        content:`<div style="padding:10px 12px;font-family:system-ui;min-width:190px">
+          <div style="font-size:13px;font-weight:700;color:#202124;margin-bottom:5px">${p.code} — ${p.name}</div>
+          <div style="font-size:12px;color:#5f6368;line-height:2">
+            <span style="background:${pc2}22;color:${pc2};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;border:1px solid ${pc2}55">${CLABELS[p.covO||'red']}</span><br>
+            Customers: <b style="color:#202124">${p.customers.toLocaleString('en-IN')}</b><br>
+            Doctors: <b style="color:#202124">${p.drs.length}</b><br>
+            Coverage: <b style="color:${pc2}">${pr.toFixed(2)} / 1000</b>
+          </div>
+        </div>`
+      });
+      infoWin.open(gmap);
+    });
+    pcPolygons.push(poly);
+    pcLabels.push(lbl);
+  });
+}
+
+function render(){
+  if(!gmap)return;
+  // Clear everything
+  zonePolygons.forEach(p=>p.setMap(null));
+  drMarkers.forEach(m=>m.setMap(null));
+  zoneLabels.forEach(l=>l.setMap(null));
+  clearPcLayer();
+  zonePolygons=[];drMarkers=[];zoneLabels=[];
+  if(infoWin)infoWin.close();
+  activeZoneId=null;
+
+  const fz=getFiltered();
+  updateSummary(fz);
+  const spf=document.getElementById('spf').value;
+  const pf=document.getElementById('pf').value;
+  const bounds=new google.maps.LatLngBounds();
+
+  fz.forEach(z=>{
+    const k=covKey(z);const c=COLS[k];
+    z.shape.forEach(pt=>bounds.extend(pt));
+
+    const poly=new google.maps.Polygon({
+      paths:z.shape,
+      strokeColor:c,strokeOpacity:1,strokeWeight:2,
+      fillColor:c,fillOpacity:0.30,
+      map:gmap,zIndex:2
+    });
+
+    poly.addListener('click',()=>{
+      // 1. Reset all zones to normal
+      zonePolygons.forEach(p=>p.setOptions({strokeWeight:2,fillOpacity:0.30,zIndex:2}));
+      // 2. Make selected zone border-only (no fill) so pincodes show through
+      poly.setOptions({strokeWeight:3.5,strokeColor:c,fillOpacity:0.0,zIndex:3});
+      activeZoneId=z.id;
+      // 3. Draw pincode polygons ON TOP
+      drawPincodeBoundaries(z);
+      openPanel(z);
+      // 4. Zoom into zone with padding for panel
+      const zb=new google.maps.LatLngBounds();
+      z.shape.forEach(pt=>zb.extend(pt));
+      gmap.fitBounds(zb,{top:50,right:310,bottom:50,left:50});
+    });
+    poly.addListener('mouseover',function(){if(activeZoneId!==z.id)this.setOptions({fillOpacity:0.48,strokeWeight:2.5});});
+    poly.addListener('mouseout',function(){if(activeZoneId!==z.id)this.setOptions({fillOpacity:0.30,strokeWeight:2});});
+    zonePolygons.push(poly);
+
+    // Zone name label
+    const cLat=z.shape.reduce((a,p)=>a+p.lat,0)/z.shape.length;
+    const cLng=z.shape.reduce((a,p)=>a+p.lng,0)/z.shape.length;
+    const lbl=new google.maps.Marker({
+      position:{lat:cLat,lng:cLng},map:gmap,
+      icon:{path:google.maps.SymbolPath.CIRCLE,scale:0},
+      label:{text:z.name,color:'#fff',fontSize:'10px',fontWeight:'700'},
+      zIndex:4,clickable:false
+    });
+    zoneLabels.push(lbl);
+
+    // Dr pins
+    z.pincodes.forEach(p=>{
+      if(pf!=='all'&&p.code!==pf)return;
+      p.drs.forEach(d=>{
+        if(spf!=='all'&&d.sp!==spf)return;
+        const pLat=p.shape.reduce((a,pt)=>a+pt.lat,0)/p.shape.length+(Math.random()-0.5)*0.002;
+        const pLng=p.shape.reduce((a,pt)=>a+pt.lng,0)/p.shape.length+(Math.random()-0.5)*0.002;
+        const mk=new google.maps.Marker({
+          position:{lat:pLat,lng:pLng},map:gmap,
+          icon:{path:google.maps.SymbolPath.CIRCLE,scale:6,fillColor:'#1D9E75',fillOpacity:1,strokeColor:'#fff',strokeWeight:2},
+          title:maskName(d.n),zIndex:25
+        });
+        mk.addListener('click',()=>{
+          if(infoWin)infoWin.close();
+          infoWin=new google.maps.InfoWindow({
+            content:`<div style="padding:10px 12px;font-family:system-ui;min-width:175px">
+              <div style="font-size:13px;font-weight:600;margin-bottom:4px;color:#202124">${maskName(d.n)}</div>
+              <div style="font-size:12px;color:#5f6368;line-height:1.6">
+                <span style="background:#e8f0fe;color:#1a73e8;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:500">${d.sp}</span><br>
+                ${d.addr}<br><span style="color:#80868b">${p.code} – ${p.name}</span>
+              </div>
+            </div>`
+          });
+          infoWin.open(gmap,mk);
+        });
+        drMarkers.push(mk);
+      });
+    });
+  });
+
+  if(fz.length>0&&!bounds.isEmpty())gmap.fitBounds(bounds,{top:40,right:40,bottom:40,left:40});
+}
+
+function openPanel(z){
+  curZ=z;
+  document.getElementById('ptitle').textContent=z.name;
+  document.getElementById('psub').textContent=z.pincodes.length+' pincodes · '+z.customers.toLocaleString('en-IN')+' customers';
+  const c=COLS[covKey(z)];
+  document.getElementById('covstrip').style.cssText='background:'+c+';height:4px;border-radius:2px;margin-bottom:10px';
+  swTab('zone',document.querySelector('.tab'));
+  document.getElementById('panel').style.display='block';
+}
+function closePanel(){
+  document.getElementById('panel').style.display='none';
+  clearPcLayer();
+  zonePolygons.forEach(p=>p.setOptions({strokeWeight:2,fillOpacity:0.30,zIndex:2}));
+  activeZoneId=null;
+  const bounds=new google.maps.LatLngBounds();
+  ZONES.forEach(z=>z.shape.forEach(pt=>bounds.extend(pt)));
+  gmap.fitBounds(bounds,{top:40,right:40,bottom:40,left:40});
+}
+function swTab(tab,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  ['zone','pins','drs'].forEach(t=>document.getElementById('t'+t).style.display=t===tab?'block':'none');
+  if(!curZ)return;
+  const z=curZ;const k=covKey(z);const c=COLS[k];const r=ratio(z);
+  if(tab==='zone'){
+    document.getElementById('tzone').innerHTML=`
+      <div class="srow"><span class="sl">Customers</span><span class="sv">${z.customers.toLocaleString('en-IN')}</span></div>
+      <div class="srow"><span class="sl">Total doctors</span><span class="sv">${drCount(z)}</span></div>
+      <div class="srow"><span class="sl">Dr / 1000 customers</span><span class="sv">${r.toFixed(2)}</span></div>
+      <div class="srow"><span class="sl">Coverage</span><span class="badge" style="background:${c}22;color:${c};border:1px solid ${c}55">${CLABELS[k]}</span></div>
+      <div class="srow"><span class="sl">Pincodes</span><span class="sv">${z.pincodes.length}</span></div>
+      <div class="srow"><span class="sl">Specialties</span><span class="sv">${[...new Set(z.pincodes.flatMap(p=>p.drs.map(d=>d.sp)))].length}</span></div>
+      <div class="pc-hint">Pincode boundaries are now visible on the map</div>`;
+  } else if(tab==='pins'){
+    document.getElementById('tpins').innerHTML=z.pincodes.map(p=>{
+      const pr=pcRatio(p);const pk=p.covO||'red';const pc=COLS[pk];
+      return`<div class="pc-card" style="background:${pc}0d;border-color:${pc}44">
+        <div class="pc-top"><span class="pc-code">${p.code}</span>
+        <span class="badge" style="background:${pc}22;color:${pc};border:1px solid ${pc}55">${pr.toFixed(2)}/1000</span></div>
+        <div class="pc-name">${p.name}</div>
+        <div class="pc-meta">${p.customers.toLocaleString('en-IN')} customers · ${p.drs.length} doctors</div>
+      </div>`;
+    }).join('');
+  } else {
+    let h='';
+    z.pincodes.forEach(p=>{
+      if(!p.drs.length)return;
+      h+=`<div class="sec-hdr">${p.code} · ${p.name}</div>`;
+      p.drs.forEach(d=>{h+=`<div class="dr-item"><div class="dr-name">${maskName(d.n)}</div><span class="dr-spec">${d.sp}</span><div class="dr-addr">${d.addr}</div></div>`;});
+    });
+    document.getElementById('tdrs').innerHTML=h||'<p style="font-size:12px;color:#5f6368;padding:8px 0">No doctors in this zone.</p>';
+  }
+}
+
+window.initMap=function(){
+  document.getElementById('status-screen').style.display='none';
+  gmap=new google.maps.Map(document.getElementById('map'),{
+    center:{lat:18.52,lng:73.86},zoom:12,mapTypeId:'roadmap',
+    zoomControlOptions:{position:google.maps.ControlPosition.RIGHT_CENTER},
+    mapTypeControlOptions:{style:google.maps.MapTypeControlStyle.HORIZONTAL_BAR,position:google.maps.ControlPosition.TOP_RIGHT},
+    streetViewControl:false,fullscreenControl:true,
+    styles:[{featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]}]
+  });
+  buildSelects();render();
+};
+window.gm_authFailure=function(){showErr('API key auth failed','Maps JS API key rejected.','Enable Maps JavaScript API in Google Cloud Console → APIs & Services → Library');};
+setTimeout(()=>{if(!gmap)showErr('Map timed out','Open Chrome DevTools (F12) → Console tab → copy red error → share here.','');},12000);
+</script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC30nNX-NSaz_GROo_TjO2LveijBsTNC6Y&callback=initMap&loading=async"></script>
+</body>
+</html>
